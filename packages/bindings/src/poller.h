@@ -1,34 +1,34 @@
 #ifndef PACKAGES_SERIALPORT_SRC_POLLER_H_
 #define PACKAGES_SERIALPORT_SRC_POLLER_H_
 
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 
-class Poller : public Nan::ObjectWrap, public Nan::AsyncResource {
+class Poller : public Napi::ObjectWrap<Poller> {
  public:
-  static NAN_MODULE_INIT(Init);
+  Poller(const Napi::CallbackInfo& info);
+  static Napi::Object Init(Napi::Env env, Napi::Object exports);
   static void onData(uv_poll_t* handle, int status, int events);
   static void onClose(uv_handle_t* poll_handle);
+  ~Poller();
 
  private:
   int fd;
   uv_poll_t* poll_handle;
-  Nan::Callback callback;
+  Napi::Env env;
+  Napi::FunctionReference callback;
   bool uv_poll_init_success = false;
 
   // can this be read off of poll_handle?
   int events = 0;
 
-  explicit Poller(int fd);
-  ~Poller();
   void poll(int events);
   void stop();
   int _stop();
 
-  static NAN_METHOD(New);
-  static NAN_METHOD(poll);
-  static NAN_METHOD(stop);
-  static NAN_METHOD(destroy);
-  static inline Nan::Persistent<v8::Function> & constructor();
+  void poll(const Napi::CallbackInfo& info);
+  void stop(const Napi::CallbackInfo& info);
+  void destroy(const Napi::CallbackInfo& info);
 };
 
 #endif  // PACKAGES_SERIALPORT_SRC_POLLER_H_

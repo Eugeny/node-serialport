@@ -1,13 +1,14 @@
 #ifndef PACKAGES_SERIALPORT_SRC_DARWIN_LIST_H_
 #define PACKAGES_SERIALPORT_SRC_DARWIN_LIST_H_
 #include <sys/param.h>  // For MAXPATHLEN
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <list>
 #include <string>
 
 #define ERROR_STRING_SIZE 1024
 
-NAN_METHOD(List);
+Napi::Value List(const Napi::CallbackInfo& info);
 void EIO_List(uv_work_t* req);
 void EIO_AfterList(uv_work_t* req);
 
@@ -21,9 +22,9 @@ struct ListResultItem {
   std::string productId;
 };
 
-struct ListBaton : public Nan::AsyncResource {
-  ListBaton() : AsyncResource("node-serialport:ListBaton"), errorString() {}
-  Nan::Callback callback;
+struct ListBaton {
+  Napi::Env env;
+  Napi::FunctionReference callback;
   std::list<ListResultItem*> results;
   char errorString[ERROR_STRING_SIZE];
 };

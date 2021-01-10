@@ -16,28 +16,32 @@
 uv_mutex_t list_mutex;
 Boolean lockInitialised = FALSE;
 
-NAN_METHOD(List) {
+Napi::Value List(const Napi::CallbackInfo& info) {
+  auto env = info.Env();
+
   // callback
-  if (!info[0]->IsFunction()) {
-    Nan::ThrowTypeError("First argument must be a function");
-    return;
+  if (!info[0].IsFunction()) {
+    Napi::TypeError::New(env, "First argument must be a function").ThrowAsJavaScriptException();
+    return env.Undefined();
   }
 
-  ListBaton* baton = new ListBaton();
+  ListBaton* baton = new ListBaton { .env = env };
   snprintf(baton->errorString, sizeof(baton->errorString), "");
-  baton->callback.Reset(info[0].As<v8::Function>());
+  baton->callback.Reset(info[0].As<Napi::Function>());
 
   uv_work_t* req = new uv_work_t();
   req->data = baton;
   uv_queue_work(uv_default_loop(), req, EIO_List, (uv_after_work_cb)EIO_AfterList);
+  return env.Undefined();
 }
 
-void setIfNotEmpty(v8::Local<v8::Object> item, std::string key, const char *value) {
-  v8::Local<v8::String> v8key = Nan::New<v8::String>(key).ToLocalChecked();
+void setIfNotEmpty(Napi::Object item, std::string key, const char *value) {
+  auto env = item.Env();
+  Napi::String v8key = Napi::String::New(env, key);
   if (strlen(value) > 0) {
-    Nan::Set(item, v8key, Nan::New<v8::String>(value).ToLocalChecked());
+    (item).Set(v8key, Napi::String::New(env, value));
   } else {
-    Nan::Set(item, v8key, Nan::Undefined());
+    (item).Set(v8key, env.Undefined());
   }
 }
 
@@ -322,19 +326,19 @@ void EIO_List(uv_work_t* req) {
 }
 
 void EIO_AfterList(uv_work_t* req) {
-  Nan::HandleScope scope;
-
   ListBaton* data = static_cast<ListBaton*>(req->data);
+  auto env = data->env;
 
-  v8::Local<v8::Value> argv[2];
   if (data->errorString[0]) {
-    argv[0] = v8::Exception::Error(Nan::New<v8::String>(data->errorString).ToLocalChecked());
-    argv[1] = Nan::Undefined();
+    data->callback.Call({
+      Napi::Error::New(env, data->errorString).Value(),
+      env.Undefined()
+    });
   } else {
-    v8::Local<v8::Array> results = Nan::New<v8::Array>();
+    Napi::Array results = Napi::Array::New(env);
     int i = 0;
     for (std::list<ListResultItem*>::iterator it = data->results.begin(); it != data->results.end(); ++it, i++) {
-      v8::Local<v8::Object> item = Nan::New<v8::Object>();
+      Napi::Object item = Napi::Object::New(env);
 
       setIfNotEmpty(item, "path", (*it)->path.c_str());
       setIfNotEmpty(item, "manufacturer", (*it)->manufacturer.c_str());
@@ -344,12 +348,10 @@ void EIO_AfterList(uv_work_t* req) {
       setIfNotEmpty(item, "vendorId", (*it)->vendorId.c_str());
       setIfNotEmpty(item, "productId", (*it)->productId.c_str());
 
-      Nan::Set(results, i, item);
+      results.Set(i, item);
     }
-    argv[0] = Nan::Null();
-    argv[1] = results;
+    data->callback.Call({ env.Null(), results });
   }
-  data->callback.Call(2, argv, data);
 
   for (std::list<ListResultItem*>::iterator it = data->results.begin(); it != data->results.end(); ++it) {
     delete *it;

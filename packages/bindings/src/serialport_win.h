@@ -3,13 +3,14 @@
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <string.h>
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <list>
 #include <string>
 
 #define ERROR_STRING_SIZE 1024
 
-struct WriteBaton : public Nan::AsyncResource {
+struct WriteBaton : public Napi::AsyncResource {
   WriteBaton() : AsyncResource("node-serialport:WriteBaton"), bufferData(), errorString() {}
   int fd = 0;
   char* bufferData = nullptr;
@@ -18,19 +19,19 @@ struct WriteBaton : public Nan::AsyncResource {
   size_t bytesWritten = 0;
   void* hThread = nullptr;
   bool complete = false;
-  Nan::Persistent<v8::Object> buffer;
-  Nan::Callback callback;
+  Napi::Persistent<v8::Object> buffer;
+  Napi::FunctionReference callback;
   int result = 0;
   char errorString[ERROR_STRING_SIZE];
 };
 
-NAN_METHOD(Write);
+Napi::Value Write(const Napi::CallbackInfo& info);
 void EIO_Write(uv_work_t* req);
 void EIO_AfterWrite(uv_async_t* req);
 DWORD __stdcall WriteThread(LPVOID param);
 
 
-struct ReadBaton : public Nan::AsyncResource {
+struct ReadBaton : public Napi::AsyncResource {
   ReadBaton() : AsyncResource("node-serialport:ReadBaton"), errorString() {}
   int fd = 0;
   char* bufferData = nullptr;
@@ -41,16 +42,16 @@ struct ReadBaton : public Nan::AsyncResource {
   void* hThread = nullptr;
   bool complete = false;
   char errorString[ERROR_STRING_SIZE];
-  Nan::Callback callback;
+  Napi::FunctionReference callback;
 };
 
-NAN_METHOD(Read);
+Napi::Value Read(const Napi::CallbackInfo& info);
 void EIO_Read(uv_work_t* req);
 void EIO_AfterRead(uv_async_t* req);
 DWORD __stdcall ReadThread(LPVOID param);
 
 
-NAN_METHOD(List);
+Napi::Value List(const Napi::CallbackInfo& info);
 void EIO_List(uv_work_t* req);
 void EIO_AfterList(uv_work_t* req);
 
@@ -64,9 +65,9 @@ struct ListResultItem {
   std::string productId;
 };
 
-struct ListBaton : public Nan::AsyncResource {
-  ListBaton() : AsyncResource("node-serialport:ListBaton") {}
-  Nan::Callback callback;
+struct ListBaton {
+  Napi::Env env;
+  Napi::FunctionReference callback;
   std::list<ListResultItem*> results;
   char errorString[ERROR_STRING_SIZE] = "";
 };

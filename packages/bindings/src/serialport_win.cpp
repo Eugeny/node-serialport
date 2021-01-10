@@ -1,6 +1,7 @@
 #include "./serialport.h"
 #include "./serialport_win.h"
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <list>
 #include <vector>
 #include <string.h>
@@ -293,27 +294,27 @@ bool IsClosingHandle(int fd) {
   return false;
 }
 
-NAN_METHOD(Write) {
+Napi::Value Write(const Napi::CallbackInfo& info) {
   // file descriptor
-  if (!info[0]->IsInt32()) {
-    Nan::ThrowTypeError("First argument must be an int");
-    return;
+  if (!info[0].IsNumber()) {
+    Napi::TypeError::New(env, "First argument must be an int").ThrowAsJavaScriptException();
+    return env.Null();
   }
-  int fd = Nan::To<int>(info[0]).FromJust();
+  int fd = info[0].As<Napi::Number>().Int32Value();
 
   // buffer
-  if (!info[1]->IsObject() || !node::Buffer::HasInstance(info[1])) {
-    Nan::ThrowTypeError("Second argument must be a buffer");
-    return;
+  if (!info[1].IsObject() || !info[1].IsBuffer()) {
+    Napi::TypeError::New(env, "Second argument must be a buffer").ThrowAsJavaScriptException();
+    return env.Null();
   }
-  v8::Local<v8::Object> buffer = Nan::To<v8::Object>(info[1]).ToLocalChecked();
-  char* bufferData = node::Buffer::Data(buffer);
-  size_t bufferLength = node::Buffer::Length(buffer);
+  Napi::Object buffer = info[1].To<Napi::Object>();
+  char* bufferData = buffer.As<Napi::Buffer<char>>().Data();
+  size_t bufferLength = buffer.As<Napi::Buffer<char>>().Length();
 
   // callback
-  if (!info[2]->IsFunction()) {
-    Nan::ThrowTypeError("Third argument must be a function");
-    return;
+  if (!info[2].IsFunction()) {
+    Napi::TypeError::New(env, "Third argument must be a function").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   WriteBaton* baton = new WriteBaton();
@@ -322,7 +323,7 @@ NAN_METHOD(Write) {
   baton->bufferData = bufferData;
   baton->bufferLength = bufferLength;
   baton->offset = 0;
-  baton->callback.Reset(info[2].As<v8::Function>());
+  baton->callback.Reset(info[2].As<Napi::Function>());
   baton->complete = false;
 
   uv_async_t* async = new uv_async_t;
@@ -380,62 +381,62 @@ DWORD __stdcall WriteThread(LPVOID param) {
 }
 
 void EIO_AfterWrite(uv_async_t* req) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
   WriteBaton* baton = static_cast<WriteBaton*>(req->data);
   WaitForSingleObject(baton->hThread, INFINITE);
   CloseHandle(baton->hThread);
   uv_close(reinterpret_cast<uv_handle_t*>(req), AsyncCloseCallback);
 
-  v8::Local<v8::Value> argv[1];
+  Napi::Value argv[1];
   if (baton->errorString[0]) {
-    argv[0] = v8::Exception::Error(Nan::New<v8::String>(baton->errorString).ToLocalChecked());
+    argv[0] = v8::Exception::Error(Napi::String::New(env, baton->errorString));
   } else {
-    argv[0] = Nan::Null();
+    argv[0] = env.Null();
   }
   baton->callback.Call(1, argv, baton);
   baton->buffer.Reset();
   delete baton;
 }
 
-NAN_METHOD(Read) {
+Napi::Value Read(const Napi::CallbackInfo& info) {
   // file descriptor
-  if (!info[0]->IsInt32()) {
-    Nan::ThrowTypeError("First argument must be a fd");
-    return;
+  if (!info[0].IsNumber()) {
+    Napi::TypeError::New(env, "First argument must be a fd").ThrowAsJavaScriptException();
+    return env.Null();
   }
-  int fd = Nan::To<int>(info[0]).FromJust();
+  int fd = info[0].As<Napi::Number>().Int32Value();
 
   // buffer
-  if (!info[1]->IsObject() || !node::Buffer::HasInstance(info[1])) {
-    Nan::ThrowTypeError("Second argument must be a buffer");
-    return;
+  if (!info[1].IsObject() || !info[1].IsBuffer()) {
+    Napi::TypeError::New(env, "Second argument must be a buffer").ThrowAsJavaScriptException();
+    return env.Null();
   }
-  v8::Local<v8::Object> buffer = Nan::To<v8::Object>(info[1]).ToLocalChecked();
-  size_t bufferLength = node::Buffer::Length(buffer);
+  Napi::Object buffer = info[1].To<Napi::Object>();
+  size_t bufferLength = buffer.As<Napi::Buffer<char>>().Length();
 
   // offset
-  if (!info[2]->IsInt32()) {
-    Nan::ThrowTypeError("Third argument must be an int");
-    return;
+  if (!info[2].IsNumber()) {
+    Napi::TypeError::New(env, "Third argument must be an int").ThrowAsJavaScriptException();
+    return env.Null();
   }
-  int offset = Nan::To<v8::Int32>(info[2]).ToLocalChecked()->Value();
+  int offset = Napi::To<v8::Int32>(info[2])->Value();
 
   // bytes to read
-  if (!info[3]->IsInt32()) {
-    Nan::ThrowTypeError("Fourth argument must be an int");
-    return;
+  if (!info[3].IsNumber()) {
+    Napi::TypeError::New(env, "Fourth argument must be an int").ThrowAsJavaScriptException();
+    return env.Null();
   }
-  size_t bytesToRead = Nan::To<v8::Int32>(info[3]).ToLocalChecked()->Value();
+  size_t bytesToRead = Napi::To<v8::Int32>(info[3])->Value();
 
   if ((bytesToRead + offset) > bufferLength) {
-    Nan::ThrowTypeError("'bytesToRead' + 'offset' cannot be larger than the buffer's length");
-    return;
+    Napi::TypeError::New(env, "'bytesToRead' + 'offset' cannot be larger than the buffer's length").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   // callback
-  if (!info[4]->IsFunction()) {
-    Nan::ThrowTypeError("Fifth argument must be a function");
-    return;
+  if (!info[4].IsFunction()) {
+    Napi::TypeError::New(env, "Fifth argument must be a function").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   ReadBaton* baton = new ReadBaton();
@@ -443,8 +444,8 @@ NAN_METHOD(Read) {
   baton->offset = offset;
   baton->bytesToRead = bytesToRead;
   baton->bufferLength = bufferLength;
-  baton->bufferData = node::Buffer::Data(buffer);
-  baton->callback.Reset(info[4].As<v8::Function>());
+  baton->bufferData = buffer.As<Napi::Buffer<char>>().Data();
+  baton->callback.Reset(info[4].As<Napi::Function>());
   baton->complete = false;
 
   uv_async_t* async = new uv_async_t;
@@ -561,19 +562,19 @@ DWORD __stdcall ReadThread(LPVOID param) {
 }
 
 void EIO_AfterRead(uv_async_t* req) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
   ReadBaton* baton = static_cast<ReadBaton*>(req->data);
   WaitForSingleObject(baton->hThread, INFINITE);
   CloseHandle(baton->hThread);
   uv_close(reinterpret_cast<uv_handle_t*>(req), AsyncCloseCallback);
 
-  v8::Local<v8::Value> argv[2];
+  Napi::Value argv[2];
   if (baton->errorString[0]) {
-    argv[0] = Nan::Error(baton->errorString);
-    argv[1] = Nan::Undefined();
+    argv[0] = Napi::Error::New(env, baton->errorString);
+    argv[1] = env.Undefined();
   } else {
-    argv[0] = Nan::Null();
-    argv[1] = Nan::New<v8::Integer>(static_cast<int>(baton->bytesRead));
+    argv[0] = env.Null();
+    argv[1] = Napi::Number::New(env, static_cast<int>(baton->bytesRead));
   }
 
   baton->callback.Call(2, argv, baton);
@@ -607,16 +608,18 @@ char *copySubstring(char *someString, int n) {
   return new_;
 }
 
-NAN_METHOD(List) {
+Napi::Value List(const Napi::CallbackInfo& info) {
+  auto env = info.Env();
+
   // callback
-  if (!info[0]->IsFunction()) {
-    Nan::ThrowTypeError("First argument must be a function");
-    return;
+  if (!info[0].IsFunction()) {
+    Napi::TypeError::New(env, "First argument must be a function").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  ListBaton* baton = new ListBaton();
+  ListBaton* baton = new ListBaton { .env = env };
   snprintf(baton->errorString, sizeof(baton->errorString), "");
-  baton->callback.Reset(info[0].As<v8::Function>());
+  baton->callback.Reset(info[0].As<Napi::Function>());
 
   uv_work_t* req = new uv_work_t();
   req->data = baton;
@@ -886,29 +889,29 @@ void EIO_List(uv_work_t* req) {
   }
 }
 
-void setIfNotEmpty(v8::Local<v8::Object> item, std::string key, const char *value) {
-  v8::Local<v8::String> v8key = Nan::New<v8::String>(key).ToLocalChecked();
+void setIfNotEmpty(Napi::Object item, std::string key, const char *value) {
+  Napi::String v8key = Napi::String::New(env, key);
   if (strlen(value) > 0) {
-    Nan::Set(item, v8key, Nan::New<v8::String>(value).ToLocalChecked());
+    (item).Set(v8key, Napi::String::New(env, value));
   } else {
-    Nan::Set(item, v8key, Nan::Undefined());
+    (item).Set(v8key, env.Undefined());
   }
 }
 
 void EIO_AfterList(uv_work_t* req) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
 
   ListBaton* data = static_cast<ListBaton*>(req->data);
 
-  v8::Local<v8::Value> argv[2];
+  Napi::Value argv[2];
   if (data->errorString[0]) {
-    argv[0] = v8::Exception::Error(Nan::New<v8::String>(data->errorString).ToLocalChecked());
-    argv[1] = Nan::Undefined();
+    argv[0] = v8::Exception::Error(Napi::String::New(env, data->errorString));
+    argv[1] = env.Undefined();
   } else {
-    v8::Local<v8::Array> results = Nan::New<v8::Array>();
+    Napi::Array results = Napi::Array::New(env);
     int i = 0;
     for (std::list<ListResultItem*>::iterator it = data->results.begin(); it != data->results.end(); ++it, i++) {
-      v8::Local<v8::Object> item = Nan::New<v8::Object>();
+      Napi::Object item = Napi::Object::New(env);
 
       setIfNotEmpty(item, "path", (*it)->path.c_str());
       setIfNotEmpty(item, "manufacturer", (*it)->manufacturer.c_str());
@@ -918,9 +921,9 @@ void EIO_AfterList(uv_work_t* req) {
       setIfNotEmpty(item, "vendorId", (*it)->vendorId.c_str());
       setIfNotEmpty(item, "productId", (*it)->productId.c_str());
 
-      Nan::Set(results, i, item);
+      (results).Set(i, item);
     }
-    argv[0] = Nan::Null();
+    argv[0] = env.Null();
     argv[1] = results;
   }
   data->callback.Call(2, argv, data);

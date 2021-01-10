@@ -3,40 +3,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 
 #define ERROR_STRING_SIZE 1024
 
-NAN_METHOD(Open);
+Napi::Value Open(const Napi::CallbackInfo& info);
 void EIO_Open(uv_work_t* req);
 void EIO_AfterOpen(uv_work_t* req);
 
-NAN_METHOD(Update);
+Napi::Value Update(const Napi::CallbackInfo& info);
 void EIO_Update(uv_work_t* req);
 void EIO_AfterUpdate(uv_work_t* req);
 
-NAN_METHOD(Close);
+Napi::Value Close(const Napi::CallbackInfo& info);
 void EIO_Close(uv_work_t* req);
 void EIO_AfterClose(uv_work_t* req);
 
-NAN_METHOD(Flush);
+Napi::Value Flush(const Napi::CallbackInfo& info);
 void EIO_Flush(uv_work_t* req);
 void EIO_AfterFlush(uv_work_t* req);
 
-NAN_METHOD(Set);
+Napi::Value Set(const Napi::CallbackInfo& info);
 void EIO_Set(uv_work_t* req);
 void EIO_AfterSet(uv_work_t* req);
 
-NAN_METHOD(Get);
+Napi::Value Get(const Napi::CallbackInfo& info);
 void EIO_Get(uv_work_t* req);
 void EIO_AfterGet(uv_work_t* req);
 
-NAN_METHOD(GetBaudRate);
+Napi::Value GetBaudRate(const Napi::CallbackInfo& info);
 void EIO_GetBaudRate(uv_work_t* req);
 void EIO_AfterGetBaudRate(uv_work_t* req);
 
-NAN_METHOD(Drain);
+Napi::Value Drain(const Napi::CallbackInfo& info);
 void EIO_Drain(uv_work_t* req);
 void EIO_AfterDrain(uv_work_t* req);
 
@@ -54,14 +55,13 @@ enum SerialPortStopBits {
   SERIALPORT_STOPBITS_TWO      = 3
 };
 
-SerialPortParity ToParityEnum(const v8::Local<v8::String>& str);
+SerialPortParity ToParityEnum(const Napi::Env& env, const Napi::String& str);
 SerialPortStopBits ToStopBitEnum(double stopBits);
 
-struct OpenBaton : public Nan::AsyncResource {
-  OpenBaton() :
-    AsyncResource("node-serialport:OpenBaton"), errorString(), path() {}
+struct OpenBaton {
   char errorString[ERROR_STRING_SIZE];
-  Nan::Callback callback;
+  Napi::FunctionReference callback;
+  Napi::Env env;
   char path[1024];
   int fd = 0;
   int result = 0;
@@ -83,21 +83,21 @@ struct OpenBaton : public Nan::AsyncResource {
 };
 
 struct ConnectionOptions {
-  ConnectionOptions() : errorString() {}
   char errorString[ERROR_STRING_SIZE];
   int fd = 0;
   int baudRate = 0;
 };
-struct ConnectionOptionsBaton : ConnectionOptions, Nan::AsyncResource {
-  ConnectionOptionsBaton() :
-    AsyncResource("node-serialport:ConnectionOptionsBaton") {}
-  Nan::Callback callback;
+
+struct ConnectionOptionsBaton : ConnectionOptions {
+  ConnectionOptionsBaton (Napi::Env &env): env(env) {};
+  Napi::Env env;
+  Napi::FunctionReference callback;
 };
 
-struct SetBaton : public Nan::AsyncResource {
-  SetBaton() : AsyncResource("node-serialport:SetBaton"), errorString() {}
+struct SetBaton {
   int fd = 0;
-  Nan::Callback callback;
+  Napi::Env env;
+  Napi::FunctionReference callback;
   int result = 0;
   char errorString[ERROR_STRING_SIZE];
   bool rts = false;
@@ -107,29 +107,28 @@ struct SetBaton : public Nan::AsyncResource {
   bool brk = false;
 };
 
-struct GetBaton : public Nan::AsyncResource {
-  GetBaton() : AsyncResource("node-serialport:GetBaton"), errorString() {}
+struct GetBaton {
   int fd = 0;
-  Nan::Callback callback;
+  Napi::Env env;
+  Napi::FunctionReference callback;
   char errorString[ERROR_STRING_SIZE];
   bool cts = false;
   bool dsr = false;
   bool dcd = false;
 };
 
-struct GetBaudRateBaton : public Nan::AsyncResource {
-  GetBaudRateBaton() :
-    AsyncResource("node-serialport:GetBaudRateBaton"), errorString() {}
+struct GetBaudRateBaton {
   int fd = 0;
-  Nan::Callback callback;
+  Napi::Env env;
+  Napi::FunctionReference callback;
   char errorString[ERROR_STRING_SIZE];
   int baudRate = 0;
 };
 
-struct VoidBaton : public Nan::AsyncResource {
-  VoidBaton() : AsyncResource("node-serialport:VoidBaton"), errorString() {}
+struct VoidBaton {
   int fd = 0;
-  Nan::Callback callback;
+  Napi::Env env;
+  Napi::FunctionReference callback;
   char errorString[ERROR_STRING_SIZE];
 };
 
